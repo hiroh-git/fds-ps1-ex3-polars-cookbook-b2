@@ -1,0 +1,20 @@
+[workspace]
+authors = ["hiroh-git <hara.yasuh@gmail.com>"]
+channels = ["main", "r", "msys2", "conda-forge"]
+name = "polars_cookbook"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+polars = "*"
+seaborn = "*"
+matplotlib = "==3.7.1"
+numpy = "==1.22.3"
+pandas = "==1.4.2"
+jupyter = "==1.0.0"
+ruff = ">=0.16.8,<0.17"
+mypy = ">=2.4.0,<3"
+pre-commit = ">=4.6.0,<5"
+identify = ">=2.5.0"
