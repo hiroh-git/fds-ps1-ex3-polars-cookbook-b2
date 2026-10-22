@@ -1,8 +1,8 @@
 # %%
-import polars as pl
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import polars as pl
 
 plt.style.use("ggplot")
 plt.rcParams["figure.figsize"] = (15, 3)
@@ -18,10 +18,8 @@ weather_2012[:5]
 
 # %%
 # TODO: load the data using polars and call the data frame pl_weather_2012
-pl_weather_2012 = pl.read_csv(
-    "../data/weather_2012.csv", try_parse_dates=True
-)
-
+pl_weather_2012 = pl.read_csv("../data/weather_2012.csv", try_parse_dates=True)
+pl_weather_2012.head(5)
 
 # %%
 # You'll see that the 'Weather' column has a text description of the weather that was going on each hour. We'll assume it's snowing if the text description contains "Snow".
@@ -58,16 +56,14 @@ plt.show()
 # TODO: and now in Polars
 # Group by month and calculate the median temperature.
 monthly_median = (
-    pl_weather_2012
-    .sort("date_time")
+    pl_weather_2012.sort("date_time")
     .group_by_dynamic("date_time", every="1mo")
     .agg(pl.col("temperature_c").median())
 )
 
 # Plot the results using matplotlib.
 plt.bar(
-    monthly_median["date_time"].dt.strftime("%b-%Y"),
-    monthly_median["temperature_c"]
+    monthly_median["date_time"].dt.strftime("%b-%Y"), monthly_median["temperature_c"]
 )
 plt.show()
 
@@ -88,19 +84,20 @@ print(pl_is_snowing.cast(pl.Float64).head(10))
 
 # Use group_by_dynamic to find the percentage of time it was snowing each month
 monthly_snowiness = (
-    pl.DataFrame({
-        "date_time": pl_weather_2012["date_time"],
-        "is_snowing": pl_is_snowing.cast(pl.Float64)
-    })
+    pl.DataFrame(
+        {
+            "date_time": pl_weather_2012["date_time"],
+            "is_snowing": pl_is_snowing.cast(pl.Float64),
+        }
+    )
     .sort("date_time")
     .group_by_dynamic("date_time", every="1mo")
-    .agg(pl.col("is_snowing").mean()) # The mean of 1s and 0s gives the percentage
+    .agg(pl.col("is_snowing").mean())  # The mean of 1s and 0s gives the percentage
 )
 
 # Plot the results using matplotlib
 plt.bar(
-    monthly_snowiness["date_time"].dt.strftime("%b"),
-    monthly_snowiness["is_snowing"]
+    monthly_snowiness["date_time"].dt.strftime("%b"), monthly_snowiness["is_snowing"]
 )
 plt.show()
 # %%
