@@ -1,5 +1,6 @@
 # %%
 # The usual preamble
+import polars as pl
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,8 +17,10 @@ plt.rcParams["font.family"] = "sans-serif"
 requests = pd.read_csv("../data/311-service-requests.csv", dtype="unicode")
 requests.head()
 
+# %%
 # TODO: load the data with Polars
-
+pl_requests = pl.read_csv("../data/311-service-requests.csv", infer_schema_length=0)
+pl_requests.head()
 
 # %%
 # How to know if your data is messy?
@@ -42,7 +45,9 @@ requests.head()
 
 requests["Incident Zip"].unique()
 
+# %%
 # TODO: what's the Polars command for this?
+np.array(pl_requests["Incident Zip"].unique())
 
 # %%
 # Fixing the nan values and string/float confusion
@@ -53,28 +58,43 @@ requests = pd.read_csv(
 )
 requests["Incident Zip"].unique()
 
+# %%
 # TODO: please implement this with Polars
-
+pl_na_values = ["NO CLUE", "N/A", "0", "NA"]
+pl_requests = pl.read_csv(
+    "../data/311-service-requests.csv",
+    null_values=pl_na_values,
+    schema_overrides={"Incident Zip": pl.String}
+)
+pl_requests["Incident Zip"].unique()
 
 # %%
 # What's up with the dashes?
 rows_with_dashes = requests["Incident Zip"].str.contains("-").fillna(False)
-len(requests[rows_with_dashes])
+print(len(requests[rows_with_dashes]))
 requests[rows_with_dashes]
 
+# %%
 # TODO: please implement this with Polars
-
+pl_rows_with_dashes = pl_requests["Incident Zip"].str.contains("-").fill_null(False)
+print(len(pl_requests.filter(pl_rows_with_dashes)))
+pl_requests.filter(pl_rows_with_dashes)
 
 # %%
 # I thought these were missing data and originally deleted them like this:
 # `requests['Incident Zip'][rows_with_dashes] = np.nan`
 # But then 9-digit zip codes are normal. Let's look at all the zip codes with more than 5 digits, make sure they're okay, and then truncate them.
 long_zip_codes = requests["Incident Zip"].str.len() > 5
-requests["Incident Zip"][long_zip_codes].unique()
+print(requests["Incident Zip"][long_zip_codes].unique())
 requests["Incident Zip"] = requests["Incident Zip"].str.slice(0, 5)
 
+# %%
 # TODO: please implement this with Polars
-
+pl_long_zip_codes = pl_requests["Incident Zip"].str.len_chars() > 5
+print(list(pl_requests["Incident Zip"].filter(pl_long_zip_codes).unique()))
+pl_requests = pl_requests.with_columns(
+    pl.col("Incident Zip").str.slice(0, 5)
+)
 
 # %%
 #  I'm still concerned about the 00000 zip codes, though: let's look at that.
@@ -83,8 +103,15 @@ requests[requests["Incident Zip"] == "00000"]
 zero_zips = requests["Incident Zip"] == "00000"
 requests.loc[zero_zips, "Incident Zip"] = np.nan
 
+# %%
 # TODO: please implement this with Polars
-
+pl_requests.filter(pl.col("Incident Zip") == "00000")
+pl_requests = pl_requests.with_columns(
+    pl.when(pl.col("Incident Zip") == "00000")
+    .then(None)
+    .otherwise(pl.col("Incident Zip"))
+    .alias("Incident Zip") # Keeps the same column name
+)
 
 # %%
 # Great. Let's see where we are now:
@@ -96,8 +123,17 @@ unique_zips
 
 # Amazing! This is much cleaner.
 
+# %%
 # TODO: please implement this with Polars
-
+pl_unique_zips = pl_requests["Incident Zip"].unique()
+pl_unique_zips = (
+    pl_requests["Incident Zip"]
+    .fill_null("NaN")
+    .cast(pl.String)
+    .unique()
+    .sort()
+)
+np.array(pl_unique_zips)
 
 # %%
 # There's something a bit weird here, though -- I looked up 77056 on Google maps, and that's in Texas.
@@ -109,15 +145,25 @@ is_close = zips.str.startswith("0") | zips.str.startswith("1")
 is_far = ~(is_close) & zips.notnull()
 zips[is_far]
 
+# %%
 # TODO: please implement this with Polars
-
+pl_zips = pl_requests["Incident Zip"]
+pl_is_close = pl_zips.str.starts_with("0") | pl_zips.str.starts_with("1")
+pl_is_far = ~pl_is_close & pl_zips.is_not_null()
+pl_zips.filter(pl_is_far)
 
 # %%
 requests[is_far][["Incident Zip", "Descriptor", "City"]].sort_values("Incident Zip")
 # Okay, there really are requests coming from LA and Houston! Good to know.
 
+# %%
 # TODO: please implement this with Polars
-
+(
+    pl_requests
+    .filter(pl_is_far)
+    .select(["Incident Zip", "Descriptor", "City"])
+    .sort("Incident Zip")
+)
 
 # %%
 # Filtering by zip code is probably a bad way to handle this -- we should really be looking at the city instead.
@@ -125,8 +171,9 @@ requests["City"].str.upper().value_counts()
 
 # It looks like these are legitimate complaints, so we'll just leave them alone.
 
+# %%
 # TODO: please implement this with Polars
-
+pl_requests["City"].str.to_uppercase().value_counts()
 
 # %%
 # Let's turn this analysis into a function putting it all together:
@@ -151,6 +198,29 @@ requests["Incident Zip"] = fix_zip_codes(requests["Incident Zip"])
 
 requests["Incident Zip"].unique()
 
+# %%
 # TODO: please implement this with Polars
+pl_na_values = ["NO CLUE", "N/A", "0", "NA"]
+pl_requests = pl.read_csv(
+    "../data/311-service-requests.csv",
+    null_values=pl_na_values,
+    schema_overrides={"Incident Zip": pl.String}
+)
+
+
+def fix_zip_codes(zips):
+    # Truncate everything to length 5
+    zips = zips.str.slice(0, 5)
+
+    # Set 00000 zip codes to nan
+    zips = zips.replace({"00000": None})
+
+    return zips
+
+
+pl_requests = pl_requests.with_columns(
+    fix_zip_codes(pl_requests["Incident Zip"])
+)
+np.array(pl_requests["Incident Zip"].unique())
 
 # %%
