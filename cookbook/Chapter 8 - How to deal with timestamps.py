@@ -1,4 +1,5 @@
 # %%
+import polars as pl
 import pandas as pd
 
 # %%
@@ -13,8 +14,15 @@ popcon = pd.read_csv(
 popcon.columns = ["atime", "ctime", "package-name", "mru-program", "tag"]
 popcon[:5]
 
+# %%
 # TODO: please reimplement this using Polars
-
+pl_popcon = pl.read_csv(
+    "../data/popularity-contest",
+    separator=" ",
+    new_columns=["atime", "ctime", "package-name", "mru-program", "tag"],
+    ignore_errors=True
+).head(-1)
+pl_popcon.head(5)
 
 # %%
 # The magical part about parsing timestamps in pandas is that numpy datetimes are already stored as Unix timestamps. So all we need to do is tell pandas that these integers are actually datetimes -- it doesn't need to do any conversion at all.
@@ -22,8 +30,11 @@ popcon[:5]
 popcon["atime"] = popcon["atime"].astype(int)
 popcon["ctime"] = popcon["ctime"].astype(int)
 
+# %%
 # TODO: please reimplement this using Polars
-
+pl_popcon = pl_popcon.with_columns(
+    pl.col(["atime", "ctime"]).cast(pl.Int64)
+)
 
 # %%
 # Every numpy array and pandas series has a dtype -- this is usually `int64`, `float64`, or `object`. Some of the time types available are `datetime64[s]`, `datetime64[ms]`, and `datetime64[us]`. There are also `timedelta` types, similarly.
@@ -33,8 +44,12 @@ popcon["atime"] = pd.to_datetime(popcon["atime"], unit="s")
 popcon["ctime"] = pd.to_datetime(popcon["ctime"], unit="s")
 popcon.head()
 
+# %%
 # TODO: please reimplement this using Polars
-
+pl_popcon = pl_popcon.with_columns(
+    pl.from_epoch(pl.col(["atime", "ctime"]), time_unit="s")
+)
+pl_popcon.head()
 
 # %%
 # Now suppose we want to look at all packages that aren't libraries.
@@ -46,7 +61,11 @@ popcon = popcon[popcon["atime"] > "1970-01-01"]
 nonlibraries = popcon[~popcon["package-name"].str.contains("lib")]
 nonlibraries.sort_values("ctime", ascending=False)[:10]
 
+# %%
 # TODO: please reimplement this using Polars
-
+pl_nonlibraries = pl_popcon.filter(
+    ~pl.col("package-name").str.contains("lib")
+)
+pl_nonlibraries.sort("ctime", descending=True).head(10)
 
 # The whole message here is that if you have a timestamp in seconds or milliseconds or nanoseconds, then you can just "cast" it to a `'datetime64[the-right-thing]'` and pandas/numpy will take care of the rest.
