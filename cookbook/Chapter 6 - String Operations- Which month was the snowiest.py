@@ -1,4 +1,5 @@
 # %%
+import polars as pl
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +16,11 @@ weather_2012 = pd.read_csv(
 )
 weather_2012[:5]
 
-# TODO: load the data using polars and call the data frame pl_wather_2012
+# %%
+# TODO: load the data using polars and call the data frame pl_weather_2012
+pl_weather_2012 = pl.read_csv(
+    "../data/weather_2012.csv", try_parse_dates=True
+)
 
 
 # %%
@@ -29,8 +34,18 @@ is_snowing = is_snowing.astype(float)
 is_snowing.plot()
 plt.show()
 
+# %%
 # TODO: do the same with polars
+# Use the '.str' namespace for string operations on Series indicating whether it was snowing or not.
+weather_description = pl_weather_2012["weather"]
+pl_is_snowing = weather_description.str.contains("Snow")
 
+# Convert the boolean Series to float.
+pl_is_snowing = pl_is_snowing.cast(pl.Float64)
+
+# Plot using matplotlib when it snowed and when it did not.
+plt.plot(pl_weather_2012["date_time"], pl_is_snowing)
+plt.show()
 
 # %%
 # If we wanted the median temperature each month, we could use the `resample()` method like this:
@@ -39,12 +54,26 @@ plt.show()
 
 # Unsurprisingly, July and August are the warmest.
 
+# %%
 # TODO: and now in Polars
+# Group by month and calculate the median temperature.
+monthly_median = (
+    pl_weather_2012
+    .sort("date_time")
+    .group_by_dynamic("date_time", every="1mo")
+    .agg(pl.col("temperature_c").median())
+)
 
+# Plot the results using matplotlib.
+plt.bar(
+    monthly_median["date_time"].dt.strftime("%b-%Y"),
+    monthly_median["temperature_c"]
+)
+plt.show()
 
 # %%
 # So we can think of snowiness as being a bunch of 1s and 0s instead of `True`s and `False`s:
-is_snowing.astype(float)[:10]
+print(is_snowing.astype(float)[:10])
 
 # and then use `resample` to find the percentage of time it was snowing each month
 is_snowing.astype(float).resample("M").apply(np.mean).plot(kind="bar")
@@ -52,4 +81,26 @@ plt.show()
 
 # So now we know! In 2012, December was the snowiest month. Also, this graph suggests something that I feel -- it starts snowing pretty abruptly in November, and then tapers off slowly and takes a long time to stop, with the last snow usually being in April or May.
 
+# %%
 # TODO: please do the same in Polars
+# Snowiness
+print(pl_is_snowing.cast(pl.Float64).head(10))
+
+# Use group_by_dynamic to find the percentage of time it was snowing each month
+monthly_snowiness = (
+    pl.DataFrame({
+        "date_time": pl_weather_2012["date_time"],
+        "is_snowing": pl_is_snowing.cast(pl.Float64)
+    })
+    .sort("date_time")
+    .group_by_dynamic("date_time", every="1mo")
+    .agg(pl.col("is_snowing").mean()) # The mean of 1s and 0s gives the percentage
+)
+
+# Plot the results using matplotlib
+plt.bar(
+    monthly_snowiness["date_time"].dt.strftime("%b"),
+    monthly_snowiness["is_snowing"]
+)
+plt.show()
+# %%
